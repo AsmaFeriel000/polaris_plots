@@ -2,6 +2,13 @@ import os
 import subprocess
 import re
 
+"""Build protein-ligand complexes by merging receptor PDBs with ligand SDFs.
+Assumes receptor files are named "rec_final_<ID>.pdb" and ligand files are named
+"rec_<ID>_mol<MOLID>.sdf", where <ID> matches between receptor and ligand.
+The output complex PDBs are saved as "rec_<ID>_mol<MOLID>.pdb".
+Requires Open Babel (obabel) to convert SDF to PDB format.
+"""
+
 BASE_DIR = "fegrow_result"
 LIG_DIR = os.path.join(BASE_DIR, "resulting_mols")
 OUT_DIR = os.path.join(BASE_DIR, "complexes_pdbs")
