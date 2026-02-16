@@ -52,5 +52,6 @@ if __name__ == "__main__":
     test_sdf = "test_mers.sdf"
     fegrow_dir = "fegrow_result"
     output_csv = "lowest_rmsds.csv"
+    
 
     find_best_rmsds(test_sdf, fegrow_dir, output_csv)

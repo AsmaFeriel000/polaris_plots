@@ -54,15 +54,17 @@ def ligand_rmsd(dock_pdb, ref_pdb):
 
     dock = Chem.MolFromPDBBlock(
         extract_ligand_block(dock_resname, dock_pdb),
-        sanitize=False, removeHs=False
+        sanitize=False
     )
+    dock = Chem.RemoveHs(dock)
 
     ref = Chem.MolFromPDBBlock(
         extract_ligand_block(ref_resname, ref_pdb),
-        sanitize=False, removeHs=False
+        sanitize=False
     )
+    ref = Chem.RemoveHs(ref)
 
-    return rdMolAlign.GetBestRMS(dock, ref)
+    return rdMolAlign.CalcRMS(dock, ref)
 
 
 # ------------------------------------------------
@@ -70,15 +72,30 @@ def ligand_rmsd(dock_pdb, ref_pdb):
 # ------------------------------------------------
 def parse_pocket_atoms(pdb_file):
 
-    coords = {}
+    """
+        Returns dict:
+            key = (resid, atom_name)
+            value = xyz
+        Hydrogens are excluded here.
+        Only atoms from residues in POCKET_RESIDS are included.
+    """
+
+    atoms = {}
 
     with open(pdb_file) as f:
         for line in f:
-            if not line.startswith("ATOM"):
+
+            if not line.startswith(("ATOM", "HETATM")):
                 continue
 
             resid = int(line[22:26])
+
             if resid not in POCKET_RESIDS:
+                continue
+
+            # EXCLUDE HYDROGENS
+            element = line[76:78].strip()
+            if element == "H":
                 continue
 
             atom_name = line[12:16].strip()
@@ -87,10 +104,9 @@ def parse_pocket_atoms(pdb_file):
             y = float(line[38:46])
             z = float(line[46:54])
 
-            key = (resid, atom_name)
-            coords[key] = np.array([x, y, z])
+            atoms[(resid, atom_name)] = np.array([x, y, z])
 
-    return coords
+    return atoms
 
 
 def pocket_rmsd(dock_pdb, ref_pdb):

@@ -42,6 +42,13 @@ def pdb_block_to_mol(block):
         sanitize=False,
         removeHs=False
     )
+
+    print("atoms before:", mol.GetNumAtoms())
+    if mol is None:
+        return None
+
+    mol = Chem.RemoveHs(mol)  # ← reassignment REQUIRED
+    print("atoms after:", mol.GetNumAtoms())  
     return mol
 
 
@@ -56,8 +63,14 @@ def compute_rmsd(dock_pdb, ref_pdb):
     if dock is None or ref is None:
         raise ValueError("Failed reading ligand")
 
+    # Check number of atoms before RMSD calculation
+    # save number of atoms in a separate file for debugging
+    with open("ligand_atom_counts_all_ligands.csv", "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([dock_pdb, ref_pdb, dock.GetNumAtoms(), ref.GetNumAtoms()])
+    
     # symmetry-correct RMSD WITHOUT needing bonds
-    return rdMolAlign.GetBestRMS(dock, ref)
+    return rdMolAlign.CalcRMS(dock, ref)
 
 
 def get_molid(filename):
