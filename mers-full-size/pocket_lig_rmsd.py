@@ -86,11 +86,11 @@ def pocket_rmsd(dock_pdb, ref_pdb):
 
     resid_string = "+".join(str(r) for r in POCKET_RESIDS)
 
-    dock_sel = f"dock and resi {resid_string} and not hydro"
-    ref_sel  = f"ref  and resi {resid_string} and not hydro"
+    dock_sel = f"dock and chain A and resi {resid_string} and not hydro"
+    ref_sel  = f"ref  and chain A and resi {resid_string} and not hydro"
 
-    #print(cmd.count_atoms(dock_sel))
-    #print(cmd.count_atoms(ref_sel))
+    print(cmd.count_atoms(dock_sel))
+    print(cmd.count_atoms(ref_sel))
 
     # rms_cur does NOT superimpose
     rms = cmd.rms_cur(dock_sel, ref_sel)
