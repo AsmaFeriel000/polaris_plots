@@ -11,20 +11,13 @@ from rdkit.Chem import rdMolAlign
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# -------------------------
-# PyMOL (headless mode)
-# -------------------------
-import pymol
-pymol.finish_launching(['pymol', '-qc'])
-from pymol import cmd
-
-
 """Compute ligand RMSD and pocket RMSD between docked MERS-CoV Mpro complexes
-and reference structures using RDKit’s CalcRMS for ligands and PyMOL rms_cur for pocket.
-Heavy atoms only. NO superposition for pocket RMSD.
-Outputs results to "complex_rmsd_results.csv".
+and reference structures using RDKit’s GetBestRMS for ligands and coordinate matching for pocket.
+Heavy atoms only. Outputs results to "complex_rmsd_results.csv" with columns: docked_file, ligand_RMSD_A, pocket_RMSD_A.
+Assumes docked complexes are in "fegrow_result/complexes_pdbs" and reference structures are in "released_MERS-CoV_Mpro/mers_files".         
+Ligand residue names are "UNL" in docked files and "UNK" in reference files.   
 """
-
+ 
 # ======================
 # USER SETTINGS
 # ======================
@@ -75,27 +68,63 @@ def ligand_rmsd(dock_pdb, ref_pdb):
 
 
 # ------------------------------------------------
-# Pocket RMSD (PyMOL rms_cur, NO superposition)
+# Pocket RMSD (coordinate matching)
 # ------------------------------------------------
+def parse_pocket_atoms(pdb_file):
+
+    """
+        Returns dict:
+            key = (resid, atom_name)
+            value = xyz
+        Hydrogens are excluded here.
+        Only atoms from residues in POCKET_RESIDS are included.
+    """
+
+    atoms = {}
+
+    with open(pdb_file) as f:
+        for line in f: 
+
+            if not line.startswith(("ATOM", "HETATM")):
+                continue
+            
+            resid = int(line[22:26])
+            
+            if resid not in POCKET_RESIDS:
+                continue
+
+            # EXCLUDE HYDROGENS  
+            element = line[76:78].strip()
+            if element == "H":
+                continue
+
+            atom_name = line[12:16].strip()
+
+            x = float(line[30:38])
+            y = float(line[38:46])
+            z = float(line[46:54])
+
+            atoms[(resid, atom_name)] = np.array([x, y, z])
+
+    return atoms
+
+
 def pocket_rmsd(dock_pdb, ref_pdb):
 
-    cmd.reinitialize()
+    dock_atoms = parse_pocket_atoms(dock_pdb)
+    ref_atoms  = parse_pocket_atoms(ref_pdb)
 
-    cmd.load(str(dock_pdb), "dock")
-    cmd.load(str(ref_pdb), "ref")
+    common = sorted(set(dock_atoms) & set(ref_atoms))
 
-    resid_string = "+".join(str(r) for r in POCKET_RESIDS)
+    if len(common) == 0:
+        raise ValueError("No matching pocket atoms found")
 
-    dock_sel = f"dock and resi {resid_string} and not hydro"
-    ref_sel  = f"ref  and resi {resid_string} and not hydro"
+    diffs = [
+        np.sum((dock_atoms[k] - ref_atoms[k])**2)
+        for k in common
+    ]
 
-    #print(cmd.count_atoms(dock_sel))
-    #print(cmd.count_atoms(ref_sel))
-
-    # rms_cur does NOT superimpose
-    rms = cmd.rms_cur(dock_sel, ref_sel)
-
-    return rms
+    return math.sqrt(sum(diffs) / len(common))
 
 
 # ------------------------------------------------
@@ -153,6 +182,7 @@ lig = df["ligand_RMSD_A"]
 poc = df["pocket_RMSD_A"]
 
 plt.figure(figsize=(6,6))
+
 plt.scatter(poc, lig, alpha=0.7)
 
 plt.xlabel("Pocket RMSD (Å)")
@@ -160,6 +190,7 @@ plt.ylabel("Ligand RMSD (Å)")
 plt.title("Ligand vs Pocket RMSD")
 
 plt.grid(True)
+
 plt.tight_layout()
 plt.savefig("ligand_vs_pocket_rmsd.png", dpi=300)
 plt.show()
