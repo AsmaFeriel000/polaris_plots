@@ -19,7 +19,7 @@ pymol.finish_launching(['pymol', '-qc'])
 from pymol import cmd
 
 
-"""Compute ligand RMSD and pocket RMSD between docked MERS-CoV Mpro complexes
+"""Compute ligand RMSD and pocket RMSD between docked MERS-CoV Mpro complexes (FEgrow to ApoDock receptors)
 and reference structures using RDKit’s CalcRMS for ligands and PyMOL rms_cur for pocket.
 Heavy atoms only. NO superposition for pocket RMSD.
 Outputs results to "complex_rmsd_results.csv".
