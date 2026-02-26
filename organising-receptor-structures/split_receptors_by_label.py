@@ -10,7 +10,8 @@ import os
 import shutil
 
 # === USER SETTINGS ===
-receptor_folder = "released-test-rec-structures"  # path where your 195 pdb files are
+#receptor_folder = "released-test-rec-structures"  # path where your 195 pdb files are
+receptor_folder = "released_test_receptor_structures"  # path where your 195 pdb files are
 labels = ['MERS-CoV Mpro',
  'MERS-CoV Mpro',
  'SARS-CoV-2 Mpro',
