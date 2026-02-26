@@ -11,13 +11,20 @@ from rdkit.Chem import rdMolAlign
 import pandas as pd
 import matplotlib.pyplot as plt
 
-"""Compute ligand RMSD and pocket RMSD between docked MERS-CoV Mpro complexes
-and reference structures using RDKit’s GetBestRMS for ligands and coordinate matching for pocket.
-Heavy atoms only. Outputs results to "complex_rmsd_results.csv" with columns: docked_file, ligand_RMSD_A, pocket_RMSD_A.
-Assumes docked complexes are in "fegrow_result/complexes_pdbs" and reference structures are in "released_MERS-CoV_Mpro/mers_files".         
-Ligand residue names are "UNL" in docked files and "UNK" in reference files.   
+# -------------------------
+# PyMOL (headless mode)
+# -------------------------
+import pymol
+pymol.finish_launching(['pymol', '-qc'])
+from pymol import cmd
+
+
+"""Compute ligand RMSD and pocket RMSD between docked MERS-CoV Mpro complexes (FEgrow to ApoDock receptors)
+and reference structures using RDKit’s CalcRMS for ligands and PyMOL rms_cur for pocket.
+Heavy atoms only. NO superposition for pocket RMSD.
+Outputs results to "complex_rmsd_results.csv".
 """
- 
+
 # ======================
 # USER SETTINGS
 # ======================
@@ -28,13 +35,10 @@ dock_resname = "UNL"
 ref_resname  = "UNK"
 
 POCKET_RESIDS = [
-    25, 26, 27, 28, 41, 49,
-    143, 144, 145, 146, 148,
-    166, 167, 168, 169, 175,
-    190, 191, 192
+    192, 49, 25, 168, 167
 ]
 
-out_csv = "complex_rmsd_results.csv"
+out_csv = "complex_rmsd_results-5-residues.csv"
 # ======================
 
 
@@ -68,63 +72,27 @@ def ligand_rmsd(dock_pdb, ref_pdb):
 
 
 # ------------------------------------------------
-# Pocket RMSD (coordinate matching)
+# Pocket RMSD (PyMOL rms_cur, NO superposition)
 # ------------------------------------------------
-def parse_pocket_atoms(pdb_file):
-
-    """
-        Returns dict:
-            key = (resid, atom_name)
-            value = xyz
-        Hydrogens are excluded here.
-        Only atoms from residues in POCKET_RESIDS are included.
-    """
-
-    atoms = {}
-
-    with open(pdb_file) as f:
-        for line in f: 
-
-            if not line.startswith(("ATOM", "HETATM")):
-                continue
-            
-            resid = int(line[22:26])
-            
-            if resid not in POCKET_RESIDS:
-                continue
-
-            # EXCLUDE HYDROGENS  
-            element = line[76:78].strip()
-            if element == "H":
-                continue
-
-            atom_name = line[12:16].strip()
-
-            x = float(line[30:38])
-            y = float(line[38:46])
-            z = float(line[46:54])
-
-            atoms[(resid, atom_name)] = np.array([x, y, z])
-
-    return atoms
-
-
 def pocket_rmsd(dock_pdb, ref_pdb):
 
-    dock_atoms = parse_pocket_atoms(dock_pdb)
-    ref_atoms  = parse_pocket_atoms(ref_pdb)
+    cmd.reinitialize()
 
-    common = sorted(set(dock_atoms) & set(ref_atoms))
+    cmd.load(str(dock_pdb), "dock")
+    cmd.load(str(ref_pdb), "ref")
 
-    if len(common) == 0:
-        raise ValueError("No matching pocket atoms found")
+    resid_string = "+".join(str(r) for r in POCKET_RESIDS)
 
-    diffs = [
-        np.sum((dock_atoms[k] - ref_atoms[k])**2)
-        for k in common
-    ]
+    dock_sel = f"dock and chain A and resi {resid_string} and sidechain and not hydro"
+    ref_sel  = f"ref  and chain A and resi {resid_string} and sidechain and not hydro"
 
-    return math.sqrt(sum(diffs) / len(common))
+    print(cmd.count_atoms(dock_sel))
+    print(cmd.count_atoms(ref_sel))
+
+    # rms_cur does NOT superimpose
+    rms = cmd.rms_cur(dock_sel, ref_sel)
+
+    return rms
 
 
 # ------------------------------------------------
@@ -174,23 +142,66 @@ with open(out_csv, "w", newline="") as f:
 
 print(f"\nSaved → {out_csv}")
 
-csv_file = "complex_rmsd_results.csv"
-
+# -------------------------
+# Load CSV
+# -------------------------
+csv_file = "complex_rmsd_results-5-residues.csv"
 df = pd.read_csv(csv_file)
 
+# -------------------------
+# Extract mol_id from filename
+# rec_<x>_mol<y>.pdb
+# -------------------------
+def extract_molid(filename):
+    m = re.search(r"_mol(\d+)\.pdb$", filename)
+    return int(m.group(1)) if m else None
+
+df["mol_id"] = df["docked_file"].apply(extract_molid)
+
+# -------------------------
+# Find lowest ligand RMSD per mol_id
+# -------------------------
+# idxmin gives the index of the lowest value per group
+lowest_idx = df.groupby("mol_id")["ligand_RMSD_A"].idxmin()
+
+# Create boolean mask
+df["is_lowest_in_group"] = False
+df.loc[lowest_idx, "is_lowest_in_group"] = True
+
+# -------------------------
+# Prepare data
+# -------------------------
 lig = df["ligand_RMSD_A"]
 poc = df["pocket_RMSD_A"]
+mask = df["is_lowest_in_group"]
 
+# -------------------------
+# Plot
+# -------------------------
 plt.figure(figsize=(6,6))
 
-plt.scatter(poc, lig, alpha=0.7)
+# Plot all points first (gray)
+plt.scatter(poc, lig, color="gray", alpha=0.6)
+
+# Overlay lowest-per-mol points (red)
+plt.scatter(
+    poc[mask],
+    lig[mask],
+    color="red",
+    s=120,
+    edgecolor="black",
+    label="Lowest ligand RMSD per mol"
+)
 
 plt.xlabel("Pocket RMSD (Å)")
 plt.ylabel("Ligand RMSD (Å)")
 plt.title("Ligand vs Pocket RMSD")
 
+plt.legend()
 plt.grid(True)
-
 plt.tight_layout()
-plt.savefig("ligand_vs_pocket_rmsd.png", dpi=300)
+
+plt.savefig("ligand_vs_pocket_rmsd-5-residues_lowest_per_mol.png", dpi=300)
 plt.show()
+
+print(f"Highlighted {mask.sum()} lowest-RMSD structures (one per mol group)")

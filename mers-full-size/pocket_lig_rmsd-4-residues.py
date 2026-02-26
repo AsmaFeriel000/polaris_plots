@@ -38,7 +38,7 @@ POCKET_RESIDS = [
     190, 184, 168, 167
 ]
 
-out_csv = "complex_rmsd_results.csv"
+out_csv = "complex_rmsd_results-4-residues.csv"
 # ======================
 
 
@@ -201,7 +201,7 @@ plt.legend()
 plt.grid(True)
 plt.tight_layout()
 
-plt.savefig("ligand_vs_pocket_rmsd_lowest_per_mol.png", dpi=300)
+plt.savefig("ligand_vs_pocket_rmsd-4-residues_lowest_per_mol.png", dpi=300)
 plt.show()
 
 print(f"Highlighted {mask.sum()} lowest-RMSD structures (one per mol group)")
