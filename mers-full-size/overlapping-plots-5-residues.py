@@ -73,9 +73,18 @@ plt.scatter(
 #    label="Submitted (all)"
 #)
 
+#plt.scatter(
+#    df_sub.loc[df_sub["is_lowest"], "pocket_RMSD_A"],
+#    df_sub.loc[df_sub["is_lowest"], "ligand_RMSD_A"],
+#    color="red",
+#    s=120,
+#    edgecolor="black",
+#    label="Original Submission"
+#)
+
 plt.scatter(
-    df_sub.loc[df_sub["is_lowest"], "pocket_RMSD_A"],
-    df_sub.loc[df_sub["is_lowest"], "ligand_RMSD_A"],
+    df_sub["pocket_RMSD_A"],
+    df_sub["ligand_RMSD_A"],
     color="red",
     s=120,
     edgecolor="black",
