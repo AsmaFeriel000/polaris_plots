@@ -93,7 +93,7 @@ plt.scatter(
 
 plt.xlabel("Pocket RMSD (Å)")
 plt.ylabel("Ligand RMSD (Å)")
-plt.title("Ligand vs Pocket RMSD")
+plt.title("Ligand vs Pocket RMSD for MERS-CoV Mpro")
 
 plt.legend()
 plt.grid(True)
