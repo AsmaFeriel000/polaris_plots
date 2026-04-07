@@ -154,7 +154,7 @@ def bootstrap_method_fast(
     method_name,
     rmsd_data,
     n_mols,
-    n_bootstrap=1000,
+    n_bootstrap=10000,
     max_N=20,
     rmsd_threshold=2.0
 ):
