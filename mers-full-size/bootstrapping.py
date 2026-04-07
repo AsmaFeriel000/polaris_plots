@@ -61,31 +61,32 @@ def load_gnina_scores(rec_dir="."):
 
 
 #############################################
-# CORE RMSD COMPUTATION
+# CORE COMPUTATION (FIXED INDEXING)
 #############################################
 
-def compute_curve(test_mols, scores_by_mol, ligand_dir, method, max_N, rmsd_threshold):
+def compute_curve(sampled_pairs, scores_by_mol, ligand_dir, method, max_N, rmsd_threshold):
 
     results = []
 
     for N in range(1, max_N + 1):
         lowest_rmsds = []
 
-        for i, test_mol in enumerate(test_mols):
+        for original_idx, test_mol in sampled_pairs:
 
+            # 🔑 FIXED: use original index
             if method == "aposcore":
-                mol_id = f"mol{i}"
+                mol_id = f"mol{original_idx}"
                 if mol_id not in scores_by_mol:
                     continue
                 ligands = scores_by_mol[mol_id][:N]
 
             elif method == "gnina":
-                if i not in scores_by_mol:
+                if original_idx not in scores_by_mol:
                     continue
-                ligands = scores_by_mol[i][:N]
+                ligands = scores_by_mol[original_idx][:N]
 
             elif method == "random":
-                pattern = os.path.join(ligand_dir, f"rec_*_mol{i}.sdf")
+                pattern = os.path.join(ligand_dir, f"rec_*_mol{original_idx}.sdf")
                 candidates = glob.glob(pattern)
                 if not candidates:
                     continue
@@ -126,7 +127,7 @@ def compute_curve(test_mols, scores_by_mol, ligand_dir, method, max_N, rmsd_thre
 
 
 #############################################
-# BOOTSTRAP ENGINE
+# BOOTSTRAP ENGINE (FIXED)
 #############################################
 
 def bootstrap_method(
@@ -134,7 +135,7 @@ def bootstrap_method(
     scores_by_mol,
     test_mols,
     ligand_dir,
-    n_bootstrap=10000,
+    n_bootstrap=10,
     max_N=20,
     rmsd_threshold=2.0,
     out_dir="bootstrap_output"
@@ -146,13 +147,22 @@ def bootstrap_method(
     for b in range(n_bootstrap):
         print(f"{method_name} bootstrap {b+1}/{n_bootstrap}")
 
+        # 🔑 FIX: keep original indices
         indices = np.random.choice(len(test_mols), len(test_mols), replace=True)
-        sampled = [test_mols[i] for i in indices]
+        sampled_pairs = [(i, test_mols[i]) for i in indices]
 
-        curve = compute_curve(sampled, scores_by_mol, ligand_dir, method_name, max_N, rmsd_threshold)
+        curve = compute_curve(
+            sampled_pairs,
+            scores_by_mol,
+            ligand_dir,
+            method_name,
+            max_N,
+            rmsd_threshold
+        )
+
         all_curves.append(curve)
 
-        # save each bootstrap
+        # save each bootstrap replicate
         with open(os.path.join(out_dir, f"{method_name}_{b:03d}.csv"), "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["N", "percent"])
@@ -163,20 +173,21 @@ def bootstrap_method(
 
 
 #############################################
-# STATS + SAVE
+# SUMMARY WITH CONFIDENCE INTERVALS
 #############################################
 
 def summarize(curves, out_csv):
     mean = np.mean(curves, axis=0)
-    std = np.std(curves, axis=0)
+    lower = np.percentile(curves, 2.5, axis=0)
+    upper = np.percentile(curves, 97.5, axis=0)
 
     with open(out_csv, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["N", "mean", "std"])
+        writer.writerow(["N", "mean", "lower_95CI", "upper_95CI"])
         for i in range(len(mean)):
-            writer.writerow([i+1, mean[i], std[i]])
+            writer.writerow([i+1, mean[i], lower[i], upper[i]])
 
-    return mean, std
+    return mean, lower, upper
 
 
 #############################################
@@ -185,44 +196,63 @@ def summarize(curves, out_csv):
 
 def run_all():
 
+    print("Loading test molecules...")
     test_mols = [m for m in Chem.SDMolSupplier("test_mers.sdf") if m is not None]
 
+    print("Loading scores...")
     aposcore_scores = load_aposcore_scores("fegrow_result/mol_scores_sorted.csv")
     gnina_scores = load_gnina_scores(".")
 
+    print("Running Aposcore bootstrap...")
     apos_curves = bootstrap_method(
         "aposcore", aposcore_scores, test_mols, "fegrow_result", out_dir="boot_aposcore"
     )
 
+    print("Running GNINA bootstrap...")
     gnina_curves = bootstrap_method(
         "gnina", gnina_scores, test_mols, "fegrow_result", out_dir="boot_gnina"
     )
 
+    print("Running Random bootstrap...")
     random_curves = bootstrap_method(
         "random", None, test_mols, "fegrow_result", out_dir="boot_random"
     )
 
-    apos_mean, apos_std = summarize(apos_curves, "aposcore_summary.csv")
-    gnina_mean, gnina_std = summarize(gnina_curves, "gnina_summary.csv")
-    rand_mean, rand_std = summarize(random_curves, "random_summary.csv")
+    print("Summarizing results...")
+    apos_mean, apos_low, apos_up = summarize(apos_curves, "aposcore_summary.csv")
+    gnina_mean, gnina_low, gnina_up = summarize(gnina_curves, "gnina_summary.csv")
+    rand_mean, rand_low, rand_up = summarize(random_curves, "random_summary.csv")
 
-    # PLOT
+    # 📊 Plot with CI bands
     N = np.arange(1, len(apos_mean)+1)
 
     plt.figure(figsize=(7,5))
 
-    plt.errorbar(N, apos_mean, yerr=apos_std, label="Aposcore", marker='o')
-    plt.errorbar(N, gnina_mean, yerr=gnina_std, label="GNINA", marker='o')
-    plt.errorbar(N, rand_mean, yerr=rand_std, label="Random", marker='o')
+    # Convert CI bounds to asymmetric error bars
+    apos_err = [apos_mean - apos_low, apos_up - apos_mean]
+    gnina_err = [gnina_mean - gnina_low, gnina_up - gnina_mean]
+    rand_err = [rand_mean - rand_low, rand_up - rand_mean]
+
+    plt.errorbar(N, apos_mean, yerr=apos_err, label="Aposcore", marker='o', capsize=4)
+    plt.errorbar(N, gnina_mean, yerr=gnina_err, label="GNINA", marker='o', capsize=4)
+    plt.errorbar(N, rand_mean, yerr=rand_err, label="Random", marker='o', capsize=4)
 
     plt.xlabel("Top N")
     plt.ylabel("% RMSD < 2 Å")
-    plt.title("Top-N Pose Accuracy (Bootstrapped)")
+    plt.title("Top-N Pose Accuracy (Bootstrapped, 95% CI)")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
     plt.savefig("combined_bootstrap_plot.png", dpi=300)
     plt.show()
+
+    print("\n✅ Done!")
+    print("Outputs:")
+    print("- boot_aposcore/")
+    print("- boot_gnina/")
+    print("- boot_random/")
+    print("- *_summary.csv")
+    print("- combined_bootstrap_plot.png")
 
 
 if __name__ == "__main__":
