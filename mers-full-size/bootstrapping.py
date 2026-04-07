@@ -61,7 +61,7 @@ def load_gnina_scores(rec_dir="."):
 
 
 #############################################
-# PRECOMPUTE RMSDs ( KEY SPEEDUP)
+# PRECOMPUTE RMSDs (FAST)
 #############################################
 
 def precompute_rmsds(test_mols, scores_by_mol, ligand_dir, method):
@@ -111,7 +111,7 @@ def precompute_rmsds(test_mols, scores_by_mol, ligand_dir, method):
 
 
 #############################################
-# FAST CURVE COMPUTATION (LOOKUP ONLY)
+# FAST CURVE COMPUTATION
 #############################################
 
 def compute_curve_fast(sampled_indices, rmsd_data, method, max_N, rmsd_threshold):
@@ -130,7 +130,6 @@ def compute_curve_fast(sampled_indices, rmsd_data, method, max_N, rmsd_threshold
 
             if method in ["aposcore", "gnina"]:
                 selected = rmsds[:N]
-
             elif method == "random":
                 selected = rmsds if len(rmsds) < N else random.sample(rmsds, N)
 
@@ -155,17 +154,13 @@ def bootstrap_method_fast(
     method_name,
     rmsd_data,
     n_mols,
-    n_bootstrap=10000,
+    n_bootstrap=1000,
     max_N=20,
-    rmsd_threshold=2.0,
-    out_dir="bootstrap_output"
+    rmsd_threshold=2.0
 ):
-    os.makedirs(out_dir, exist_ok=True)
-
     all_curves = []
 
     for b in range(n_bootstrap):
-
         indices = np.random.choice(n_mols, n_mols, replace=True)
 
         curve = compute_curve_fast(
@@ -182,7 +177,7 @@ def bootstrap_method_fast(
 
 
 #############################################
-# SUMMARY
+# SUMMARY + SAVE
 #############################################
 
 def summarize(curves):
@@ -190,6 +185,14 @@ def summarize(curves):
     lower = np.percentile(curves, 2.5, axis=0)
     upper = np.percentile(curves, 97.5, axis=0)
     return mean, lower, upper
+
+
+def save_summary_csv(filename, mean, lower, upper):
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["N", "mean", "lower_95CI", "upper_95CI"])
+        for i in range(len(mean)):
+            writer.writerow([i+1, mean[i], lower[i], upper[i]])
 
 
 #############################################
@@ -205,21 +208,30 @@ def run_all():
     aposcore_scores = load_aposcore_scores("fegrow_result/mol_scores_sorted.csv")
     gnina_scores = load_gnina_scores(".")
 
-    print("Precomputing RMSDs (this is the slow step)...")
+    print("Precomputing RMSDs (slow step)...")
 
     apos_rmsd = precompute_rmsds(test_mols, aposcore_scores, "fegrow_result", "aposcore")
     gnina_rmsd = precompute_rmsds(test_mols, gnina_scores, "fegrow_result", "gnina")
     random_rmsd = precompute_rmsds(test_mols, None, "fegrow_result", "random")
 
-    print("Bootstrapping (now fast)...")
+    print("Bootstrapping (fast)...")
 
     apos_curves = bootstrap_method_fast("aposcore", apos_rmsd, len(test_mols))
     gnina_curves = bootstrap_method_fast("gnina", gnina_rmsd, len(test_mols))
     rand_curves = bootstrap_method_fast("random", random_rmsd, len(test_mols))
 
+    print("Summarizing...")
+
     apos_mean, apos_low, apos_up = summarize(apos_curves)
     gnina_mean, gnina_low, gnina_up = summarize(gnina_curves)
     rand_mean, rand_low, rand_up = summarize(rand_curves)
+
+    # Save CSVs
+    save_summary_csv("aposcore_summary.csv", apos_mean, apos_low, apos_up)
+    save_summary_csv("gnina_summary.csv", gnina_mean, gnina_low, gnina_up)
+    save_summary_csv("random_summary.csv", rand_mean, rand_low, rand_up)
+
+    print("Plotting...")
 
     N = np.arange(1, len(apos_mean)+1)
 
@@ -235,12 +247,19 @@ def run_all():
 
     plt.xlabel("Top N")
     plt.ylabel("% RMSD < 2 Å")
-    plt.title("Top-N Pose Accuracy (Bootstrapped, Fast)")
+    plt.title("Top-N Pose Accuracy")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
     plt.savefig("combined_bootstrap_plot.png", dpi=300)
     plt.show()
+
+    print("\n Done!")
+    print("Saved:")
+    print("- aposcore_summary.csv")
+    print("- gnina_summary.csv")
+    print("- random_summary.csv")
+    print("- combined_bootstrap_fast.png")
 
 
 if __name__ == "__main__":
