@@ -7,7 +7,8 @@ from rdkit import Chem
 from rdkit.Chem import rdMolAlign
 from collections import defaultdict
 
-"""calculate rmsd between best scoring molecule (apodock score) and corresponding test_mers.sdf (released test poses for mers)""" 
+""" This script evaluates how the RMSD of the best-scoring ligand (according to Aposcore) changes as we consider more top-scoring ligands for each test molecule. It generates a summary CSV and a plot showing the percentage of ligands with RMSD below a specified threshold as a function of N (the number of top ligands considered).
+"""
 
 def load_scores(csv_file):
     scores_by_mol = defaultdict(list)
