@@ -73,7 +73,7 @@ def compute_curve(sampled_pairs, scores_by_mol, ligand_dir, method, max_N, rmsd_
 
         for original_idx, test_mol in sampled_pairs:
 
-            # 🔑 FIXED: use original index
+            # FIXED: use original index
             if method == "aposcore":
                 mol_id = f"mol{original_idx}"
                 if mol_id not in scores_by_mol:
@@ -147,7 +147,7 @@ def bootstrap_method(
     for b in range(n_bootstrap):
         print(f"{method_name} bootstrap {b+1}/{n_bootstrap}")
 
-        # 🔑 FIX: keep original indices
+        # FIX: keep original indices
         indices = np.random.choice(len(test_mols), len(test_mols), replace=True)
         sampled_pairs = [(i, test_mols[i]) for i in indices]
 
@@ -223,7 +223,7 @@ def run_all():
     gnina_mean, gnina_low, gnina_up = summarize(gnina_curves, "gnina_summary.csv")
     rand_mean, rand_low, rand_up = summarize(random_curves, "random_summary.csv")
 
-    # 📊 Plot with CI bands
+    # Plot with CI bands
     N = np.arange(1, len(apos_mean)+1)
 
     plt.figure(figsize=(7,5))
