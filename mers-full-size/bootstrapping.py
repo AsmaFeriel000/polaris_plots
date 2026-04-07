@@ -61,60 +61,81 @@ def load_gnina_scores(rec_dir="."):
 
 
 #############################################
-# CORE COMPUTATION (FIXED INDEXING)
+# PRECOMPUTE RMSDs ( KEY SPEEDUP)
 #############################################
 
-def compute_curve(sampled_pairs, scores_by_mol, ligand_dir, method, max_N, rmsd_threshold):
+def precompute_rmsds(test_mols, scores_by_mol, ligand_dir, method):
+    rmsd_data = {}
+
+    for i, test_mol in enumerate(test_mols):
+
+        if method == "aposcore":
+            mol_id = f"mol{i}"
+            if mol_id not in scores_by_mol:
+                continue
+            ligands = scores_by_mol[mol_id]
+
+        elif method == "gnina":
+            if i not in scores_by_mol:
+                continue
+            ligands = scores_by_mol[i]
+
+        elif method == "random":
+            pattern = os.path.join(ligand_dir, f"rec_*_mol{i}.sdf")
+            lig_files = glob.glob(pattern)
+            ligands = [(f, 0) for f in lig_files]
+
+        rmsds = []
+
+        for lig_name, _ in ligands:
+
+            lig_path = lig_name if method == "random" else os.path.join(ligand_dir, lig_name)
+
+            if not os.path.exists(lig_path):
+                continue
+
+            supplier = Chem.SDMolSupplier(lig_path)
+            if not supplier or supplier[0] is None:
+                continue
+
+            try:
+                rmsd = rdMolAlign.CalcRMS(test_mol, supplier[0])
+                rmsds.append(rmsd)
+            except:
+                continue
+
+        if rmsds:
+            rmsd_data[i] = rmsds
+
+    return rmsd_data
+
+
+#############################################
+# FAST CURVE COMPUTATION (LOOKUP ONLY)
+#############################################
+
+def compute_curve_fast(sampled_indices, rmsd_data, method, max_N, rmsd_threshold):
 
     results = []
 
     for N in range(1, max_N + 1):
         lowest_rmsds = []
 
-        for original_idx, test_mol in sampled_pairs:
+        for idx in sampled_indices:
 
-            # FIXED: use original index
-            if method == "aposcore":
-                mol_id = f"mol{original_idx}"
-                if mol_id not in scores_by_mol:
-                    continue
-                ligands = scores_by_mol[mol_id][:N]
+            if idx not in rmsd_data:
+                continue
 
-            elif method == "gnina":
-                if original_idx not in scores_by_mol:
-                    continue
-                ligands = scores_by_mol[original_idx][:N]
+            rmsds = rmsd_data[idx]
+
+            if method in ["aposcore", "gnina"]:
+                selected = rmsds[:N]
 
             elif method == "random":
-                pattern = os.path.join(ligand_dir, f"rec_*_mol{original_idx}.sdf")
-                candidates = glob.glob(pattern)
-                if not candidates:
-                    continue
-                chosen = candidates if len(candidates) < N else random.sample(candidates, N)
-                ligands = [(c, 0) for c in chosen]
+                selected = rmsds if len(rmsds) < N else random.sample(rmsds, N)
 
-            best_rmsd = None
-
-            for lig_name, _ in ligands:
-
-                lig_path = lig_name if method == "random" else os.path.join(ligand_dir, lig_name)
-
-                if not os.path.exists(lig_path):
-                    continue
-
-                supplier = Chem.SDMolSupplier(lig_path)
-                if not supplier or supplier[0] is None:
-                    continue
-
-                try:
-                    rmsd = rdMolAlign.CalcRMS(test_mol, supplier[0])
-                    if best_rmsd is None or rmsd < best_rmsd:
-                        best_rmsd = rmsd
-                except:
-                    continue
-
-            if best_rmsd is not None:
-                lowest_rmsds.append(best_rmsd)
+            if selected:
+                lowest_rmsds.append(min(selected))
 
         pct = (
             100 * sum(r < rmsd_threshold for r in lowest_rmsds) / len(lowest_rmsds)
@@ -127,15 +148,14 @@ def compute_curve(sampled_pairs, scores_by_mol, ligand_dir, method, max_N, rmsd_
 
 
 #############################################
-# BOOTSTRAP ENGINE (FIXED)
+# BOOTSTRAP
 #############################################
 
-def bootstrap_method(
+def bootstrap_method_fast(
     method_name,
-    scores_by_mol,
-    test_mols,
-    ligand_dir,
-    n_bootstrap=10,
+    rmsd_data,
+    n_mols,
+    n_bootstrap=10000,
     max_N=20,
     rmsd_threshold=2.0,
     out_dir="bootstrap_output"
@@ -145,16 +165,12 @@ def bootstrap_method(
     all_curves = []
 
     for b in range(n_bootstrap):
-        print(f"{method_name} bootstrap {b+1}/{n_bootstrap}")
 
-        # FIX: keep original indices
-        indices = np.random.choice(len(test_mols), len(test_mols), replace=True)
-        sampled_pairs = [(i, test_mols[i]) for i in indices]
+        indices = np.random.choice(n_mols, n_mols, replace=True)
 
-        curve = compute_curve(
-            sampled_pairs,
-            scores_by_mol,
-            ligand_dir,
+        curve = compute_curve_fast(
+            indices,
+            rmsd_data,
             method_name,
             max_N,
             rmsd_threshold
@@ -162,36 +178,22 @@ def bootstrap_method(
 
         all_curves.append(curve)
 
-        # save each bootstrap replicate
-        with open(os.path.join(out_dir, f"{method_name}_{b:03d}.csv"), "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["N", "percent"])
-            for i, val in enumerate(curve, 1):
-                writer.writerow([i, val])
-
     return np.array(all_curves)
 
 
 #############################################
-# SUMMARY WITH CONFIDENCE INTERVALS
+# SUMMARY
 #############################################
 
-def summarize(curves, out_csv):
+def summarize(curves):
     mean = np.mean(curves, axis=0)
     lower = np.percentile(curves, 2.5, axis=0)
     upper = np.percentile(curves, 97.5, axis=0)
-
-    with open(out_csv, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["N", "mean", "lower_95CI", "upper_95CI"])
-        for i in range(len(mean)):
-            writer.writerow([i+1, mean[i], lower[i], upper[i]])
-
     return mean, lower, upper
 
 
 #############################################
-# MAIN PIPELINE
+# MAIN
 #############################################
 
 def run_all():
@@ -203,56 +205,42 @@ def run_all():
     aposcore_scores = load_aposcore_scores("fegrow_result/mol_scores_sorted.csv")
     gnina_scores = load_gnina_scores(".")
 
-    print("Running Aposcore bootstrap...")
-    apos_curves = bootstrap_method(
-        "aposcore", aposcore_scores, test_mols, "fegrow_result", out_dir="boot_aposcore"
-    )
+    print("Precomputing RMSDs (this is the slow step)...")
 
-    print("Running GNINA bootstrap...")
-    gnina_curves = bootstrap_method(
-        "gnina", gnina_scores, test_mols, "fegrow_result", out_dir="boot_gnina"
-    )
+    apos_rmsd = precompute_rmsds(test_mols, aposcore_scores, "fegrow_result", "aposcore")
+    gnina_rmsd = precompute_rmsds(test_mols, gnina_scores, "fegrow_result", "gnina")
+    random_rmsd = precompute_rmsds(test_mols, None, "fegrow_result", "random")
 
-    print("Running Random bootstrap...")
-    random_curves = bootstrap_method(
-        "random", None, test_mols, "fegrow_result", out_dir="boot_random"
-    )
+    print("Bootstrapping (now fast)...")
 
-    print("Summarizing results...")
-    apos_mean, apos_low, apos_up = summarize(apos_curves, "aposcore_summary.csv")
-    gnina_mean, gnina_low, gnina_up = summarize(gnina_curves, "gnina_summary.csv")
-    rand_mean, rand_low, rand_up = summarize(random_curves, "random_summary.csv")
+    apos_curves = bootstrap_method_fast("aposcore", apos_rmsd, len(test_mols))
+    gnina_curves = bootstrap_method_fast("gnina", gnina_rmsd, len(test_mols))
+    rand_curves = bootstrap_method_fast("random", random_rmsd, len(test_mols))
 
-    # Plot with CI bands
+    apos_mean, apos_low, apos_up = summarize(apos_curves)
+    gnina_mean, gnina_low, gnina_up = summarize(gnina_curves)
+    rand_mean, rand_low, rand_up = summarize(rand_curves)
+
     N = np.arange(1, len(apos_mean)+1)
 
     plt.figure(figsize=(7,5))
 
-    # Convert CI bounds to asymmetric error bars
     apos_err = [apos_mean - apos_low, apos_up - apos_mean]
     gnina_err = [gnina_mean - gnina_low, gnina_up - gnina_mean]
     rand_err = [rand_mean - rand_low, rand_up - rand_mean]
 
-    plt.errorbar(N, apos_mean, yerr=apos_err, label="Aposcore", marker='o', capsize=4)
-    plt.errorbar(N, gnina_mean, yerr=gnina_err, label="GNINA", marker='o', capsize=4)
-    plt.errorbar(N, rand_mean, yerr=rand_err, label="Random", marker='o', capsize=4)
+    plt.errorbar(N, apos_mean, yerr=apos_err, marker='o', capsize=4, label="Aposcore")
+    plt.errorbar(N, gnina_mean, yerr=gnina_err, marker='o', capsize=4, label="GNINA")
+    plt.errorbar(N, rand_mean, yerr=rand_err, marker='o', capsize=4, label="Random")
 
     plt.xlabel("Top N")
     plt.ylabel("% RMSD < 2 Å")
-    plt.title("Top-N Pose Accuracy (Bootstrapped, 95% CI)")
+    plt.title("Top-N Pose Accuracy (Bootstrapped, Fast)")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
     plt.savefig("combined_bootstrap_plot.png", dpi=300)
     plt.show()
-
-    print("\n✅ Done!")
-    print("Outputs:")
-    print("- boot_aposcore/")
-    print("- boot_gnina/")
-    print("- boot_random/")
-    print("- *_summary.csv")
-    print("- combined_bootstrap_plot.png")
 
 
 if __name__ == "__main__":
