@@ -247,7 +247,7 @@ def run_all():
 
     plt.xlabel("Top N")
     plt.ylabel("% RMSD < 2 Å")
-    plt.title("Top-N Pose Accuracy")
+    plt.title("Top-N Pose Accuracy for MERS-CoV Mpro") 
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
