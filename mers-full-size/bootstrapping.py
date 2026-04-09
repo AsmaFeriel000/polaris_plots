@@ -250,6 +250,7 @@ def run_all():
     plt.title("Top-N Pose Accuracy for MERS-CoV Mpro") 
     plt.legend()
     plt.grid(True)
+    plt.xticks(np.arange(1, len(N)+1, 2))
     plt.tight_layout()
     plt.savefig("combined_bootstrap_plot.png", dpi=300)
     plt.show()
