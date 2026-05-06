@@ -9,6 +9,7 @@ from rdkit.Chem import rdMolAlign
 import pandas as pd
 import matplotlib.pyplot as plt
 
+
 # ==========================================================
 # OVERLAY PLOT: FEgrow (Script 1) vs Submitted (Script 2)
 # ==========================================================
@@ -40,6 +41,20 @@ df_sub["is_lowest"]    = False
 
 df_fegrow.loc[lowest_idx_fegrow, "is_lowest"] = True
 df_sub.loc[lowest_idx_sub, "is_lowest"]       = True
+
+# ----------------------------------------------------------
+# Percentage of lowest-per-mol with ligand RMSD < 2 Å
+# ----------------------------------------------------------
+lowest_fegrow = df_fegrow[df_fegrow["is_lowest"]]
+
+total = len(lowest_fegrow)
+below_2 = (lowest_fegrow["ligand_RMSD_A"] < 2).sum()
+
+percentage = (below_2 / total) * 100
+
+print(f"Total lowest-per-molecule points: {total}")
+print(f"With ligand RMSD < 2 Å: {below_2}")
+print(f"Percentage: {percentage:.2f}%")
 
 # ----------------------------------------------------------
 # Plot
@@ -91,6 +106,28 @@ plt.scatter(
     label="Original Submission"
 )
 
+# Specific points to highlight
+point1 = (4.770911805362309, 2.1209278106689453)
+point2 = (0.553152343528901, 1.8176279067993164)
+
+# Highlight point 1 (e.g., green)
+plt.scatter(
+    point1[1], point1[0],  # (x = pocket, y = ligand)
+    color="orange",
+    s=150,
+    edgecolor="black",
+    label="Mol 02 originally"
+)
+
+# Highlight point 2 (e.g., purple)
+plt.scatter(
+    point2[1], point2[0],
+    color="yellow",
+    s=150,
+    edgecolor="black",
+    label="Mol 02 after side-chain modelling"
+)
+
 plt.xlabel("Pocket RMSD (Å)")
 plt.ylabel("Ligand RMSD (Å)")
 plt.title("Ligand vs Pocket RMSD for MERS-CoV Mpro")
@@ -101,3 +138,4 @@ plt.tight_layout()
 
 plt.savefig("overlay_ligand_vs_pocket_rmsd.png", dpi=300)
 plt.show()
+

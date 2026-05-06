@@ -3,7 +3,7 @@ import csv
 count = 0
 total = 0
 
-with open("complex_rmsd_results-submitted-vs-ref-5-residues.csv") as f:
+with open("complex_rmsd_results-submitted-vs-ref-3-residues.csv") as f:
     reader = csv.reader(f)
     next(reader)  # skip header
     for row in reader:
