@@ -6,6 +6,12 @@ import glob
 import os
 from scipy.stats import ks_2samp
 
+"""
+This script compares the distributions of residue-wise RMSD values between ApoDock-generated structures and experimental crystal structures for the SARS-CoV-2. It computes the RMSD of selected residues (excluding hydrogens and backbone atoms) relative to a reference structure, and visualizes the distributions using histograms. The Kolmogorov-Smirnov test is used to assess the statistical differences between the two distributions for each residue.
+Histograms produced, unless KDE plots are uncommented, which can be enabled by uncommenting the relevant lines. The script also prints out the number of samples and KS test results for each residue.
+legend modified to only show on the last subplot to avoid repetition/ omitted altogether, which can be enabled by uncommenting the relevant lines.
+""" 
+
 # ----------------------------
 # USER INPUT
 # ----------------------------
@@ -136,8 +142,13 @@ for i, res in enumerate(residues):
         print(f"  KS statistic = {stat:.3f}")
         print(f"  KS p-value   = {p:.3e}")
 
-    sns.kdeplot(xtal_vals, ax=ax, label="Experimental", fill=True, alpha=0.4)
-    sns.kdeplot(apo_vals, ax=ax, label="ApoDock", fill=True, alpha=0.4)
+    #sns.kdeplot(xtal_vals, ax=ax, label="Experimental", fill=True, alpha=0.4)
+    #sns.kdeplot(apo_vals, ax=ax, label="ApoDock", fill=True, alpha=0.4)
+    
+    sns.histplot(xtal_vals, ax=ax, stat="density", bins=20, alpha=0.3, label="Experimental")
+    sns.histplot(apo_vals, ax=ax, stat="density", bins=10, alpha=0.3, label="ApoDock")
+
+
 
     ax.set_title(label)
     ax.set_xlabel("RMSD (Å)")
@@ -145,11 +156,19 @@ for i, res in enumerate(residues):
     if i == 0:
         ax.set_ylabel("Density")
 
-    ax.legend()
+    #ax.legend()
+
+    #if i == len(residues) - 1:
+    #    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1))
+
+    if i == len(residues) - 1:
+        ax.legend()
+
+
 
 
 
 plt.suptitle("Residue-wise Pocket RMSD Distributions", y=1.05)
 plt.tight_layout()
-plt.savefig("pocket_rmsd_distributions-per-residue.png", dpi=300)
+plt.savefig("pocket_rmsd_distributions-per-residue-histogram.png", dpi=300)
 plt.show()

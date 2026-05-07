@@ -1,7 +1,7 @@
 #import pandas as pd
 
 # Load your CSV
-#df = pd.read_csv("complex_rmsd_results-5-residues.csv")
+#df = pd.read_csv("complex_rmsd_results-3-residues.csv")
 
 # Extract molecule ID (recX) from docked_file
 #df["molecule"] = df["docked_file"].str.extract(r"(rec_\d+)")
@@ -20,12 +20,11 @@
 #print(f"With ligand RMSD < 2 Å: {below_2}")
 #print(f"Percentage: {percentage:.2f}%")
 
-
 import pandas as pd
 import re
 
 # Load your CSV (same file as Script 1)
-df = pd.read_csv("complex_rmsd_results-5-residues.csv")
+df = pd.read_csv("complex_rmsd_results-3-residues.csv")
 
 # ----------------------------------------------------------
 # STEP 0: Extract mol_id EXACTLY as in plotting script

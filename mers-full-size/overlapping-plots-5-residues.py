@@ -43,6 +43,19 @@ df_fegrow.loc[lowest_idx_fegrow, "is_lowest"] = True
 df_sub.loc[lowest_idx_sub, "is_lowest"]       = True
 
 # ----------------------------------------------------------
+# Percentage of BLUE points (FEgrow lowest-per-mol) with POCKET RMSD < 2 Å
+# ----------------------------------------------------------
+blue_df = df_fegrow[df_fegrow["is_lowest"]]
+
+total_blue = len(blue_df)
+blue_below_2 = (blue_df["pocket_RMSD_A"] < 2).sum()
+
+blue_percentage = (blue_below_2 / total_blue) * 100 if total_blue > 0 else 0
+
+print(f"\nBLUE points (FEgrow lowest-per-mol): {total_blue}")
+print(f"BLUE points with POCKET RMSD < 2 Å: {blue_below_2}")
+print(f"BLUE percentage: {blue_percentage:.2f}%")
+# ----------------------------------------------------------
 # Percentage of lowest-per-mol with ligand RMSD < 2 Å
 # ----------------------------------------------------------
 lowest_fegrow = df_fegrow[df_fegrow["is_lowest"]]
