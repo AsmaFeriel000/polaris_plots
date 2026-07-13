@@ -7,10 +7,9 @@ import os
 from scipy.stats import ks_2samp
 
 """
-This script compares the distributions of residue-wise RMSD values between ApoDock-generated structures and experimental crystal structures for the SARS-CoV-2. It computes the RMSD of selected residues (excluding hydrogens and backbone atoms) relative to a reference structure, and visualizes the distributions using histograms. The Kolmogorov-Smirnov test is used to assess the statistical differences between the two distributions for each residue.
-Histograms produced, unless KDE plots are uncommented, which can be enabled by uncommenting the relevant lines. The script also prints out the number of samples and KS test results for each residue.
-legend modified to only show on the last subplot to avoid repetition/ omitted altogether, which can be enabled by uncommenting the relevant lines.
-""" 
+SARS-CoV-2 Mpro residue-wise RMSD distribution comparison
+Uses fixed x-range and constant bin width for all histograms.
+"""
 
 # ----------------------------
 # USER INPUT
@@ -19,19 +18,28 @@ legend modified to only show on the last subplot to avoid repetition/ omitted al
 reference_pdb = "complex-SARS.pdb"
 
 apodock_dir = "apodockRec-H"
-xtal_dir    = "released_SARS-CoV-2_Mpro"
+xtal_dir = "released_SARS-CoV-2_Mpro"
 
 residues = [49, 165, 189]
+
+# ----------------------------
+# GLOBAL HISTOGRAM SETTINGS
+# ----------------------------
+
+XMIN = 0.0
+XMAX = 3.0
+BIN_WIDTH = 0.1
+BINS = np.arange(XMIN, XMAX + BIN_WIDTH, BIN_WIDTH)
 
 # ----------------------------
 # FILES
 # ----------------------------
 
 apodock_files = sorted(glob.glob(os.path.join(apodock_dir, "*.pdb")))
-xtal_files    = sorted(glob.glob(os.path.join(xtal_dir, "*.pdb")))
+xtal_files = sorted(glob.glob(os.path.join(xtal_dir, "*.pdb")))
 
 # ----------------------------
-# AMINO ACID MAP (3-letter → 1-letter)
+# AMINO ACID MAP
 # ----------------------------
 
 aa_map = {
@@ -41,18 +49,13 @@ aa_map = {
     "SER":"S","THR":"T","TRP":"W","TYR":"Y","VAL":"V"
 }
 
-# ----------------------------
-# CREATE RESIDUE LABELS (e.g. M49)
-# ----------------------------
-
 def get_residue_labels(universe, residues):
     labels = {}
     for res in residues:
         sel = universe.select_atoms(f"resid {res} and name CA")
         if len(sel) > 0:
             resname = sel.resnames[0]
-            one_letter = aa_map.get(resname, "X")
-            labels[res] = f"{one_letter}{res}"
+            labels[res] = f"{aa_map.get(resname, 'X')}{res}"
         else:
             labels[res] = f"Res{res}"
     return labels
@@ -61,18 +64,19 @@ ref = mda.Universe(reference_pdb)
 residue_labels = get_residue_labels(ref, residues)
 
 # ----------------------------
-# CORE FUNCTION (UNCHANGED)
+# CORE FUNCTION
 # ----------------------------
 
 def compute_residue_distributions(structure_files, reference_pdb, residues):
 
     ref = mda.Universe(reference_pdb)
 
-    ref_atoms = {}
-    for res in residues:
-        ref_atoms[res] = ref.select_atoms(
+    ref_atoms = {
+        res: ref.select_atoms(
             f"segid A and resid {res} and not name H* and not backbone"
         )
+        for res in residues
+    }
 
     results = {res: [] for res in residues}
 
@@ -81,7 +85,6 @@ def compute_residue_distributions(structure_files, reference_pdb, residues):
             u = mda.Universe(f)
 
             for res in residues:
-
                 ref_sel = ref_atoms[res]
                 mob_sel = u.select_atoms(
                     f"segid A and resid {res} and not name H* and not backbone"
@@ -100,11 +103,9 @@ def compute_residue_distributions(structure_files, reference_pdb, residues):
                     continue
 
                 results[res].append(rmsd)
-        
-            #print(u.select_atoms(f"resid {res}").segids)
+
         except Exception as e:
             print(f"Error with {f}: {e}")
-            continue
 
     return results
 
@@ -113,13 +114,18 @@ def compute_residue_distributions(structure_files, reference_pdb, residues):
 # ----------------------------
 
 apodock_res = compute_residue_distributions(apodock_files, reference_pdb, residues)
-xtal_res    = compute_residue_distributions(xtal_files, reference_pdb, residues)
+xtal_res = compute_residue_distributions(xtal_files, reference_pdb, residues)
 
 # ----------------------------
 # PLOT
 # ----------------------------
 
-fig, axes = plt.subplots(1, len(residues), figsize=(4*len(residues), 4), sharey=True)
+fig, axes = plt.subplots(
+    1, len(residues),
+    figsize=(4*len(residues), 4),
+    sharex=True,
+    sharey=True
+)
 
 if len(residues) == 1:
     axes = [axes]
@@ -134,41 +140,45 @@ for i, res in enumerate(residues):
     label = residue_labels[res]
 
     print(f"\n{label}")
-    print(f"  ApoDock n = {len(apo_vals)}")
-    print(f"  Experimental n = {len(xtal_vals)}")
+    print(f"ApoDock n = {len(apo_vals)}")
+    print(f"Experimental n = {len(xtal_vals)}")
 
     if len(apo_vals) > 1 and len(xtal_vals) > 1:
         stat, p = ks_2samp(apo_vals, xtal_vals)
-        print(f"  KS statistic = {stat:.3f}")
-        print(f"  KS p-value   = {p:.3e}")
+        print(f"KS statistic = {stat:.3f}")
+        print(f"KS p-value = {p:.3e}")
 
-    #sns.kdeplot(xtal_vals, ax=ax, label="Experimental", fill=True, alpha=0.4)
-    #sns.kdeplot(apo_vals, ax=ax, label="ApoDock", fill=True, alpha=0.4)
-    
-    sns.histplot(xtal_vals, ax=ax, stat="density", bins=20, alpha=0.3, label="Experimental")
-    sns.histplot(apo_vals, ax=ax, stat="density", bins=10, alpha=0.3, label="ApoDock")
+    sns.histplot(
+        xtal_vals,
+        bins=BINS,
+        binrange=(XMIN, XMAX),
+        stat="density",
+        alpha=0.3,
+        label="Experimental",
+        ax=ax
+    )
 
+    sns.histplot(
+        apo_vals,
+        bins=BINS,
+        binrange=(XMIN, XMAX),
+        stat="density",
+        alpha=0.3,
+        label="ApoDock",
+        ax=ax
+    )
 
-
+    ax.set_xlim(XMIN, XMAX)
     ax.set_title(label)
     ax.set_xlabel("RMSD (Å)")
 
     if i == 0:
         ax.set_ylabel("Density")
 
-    #ax.legend()
-
-    #if i == len(residues) - 1:
-    #    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1))
-
     if i == len(residues) - 1:
         ax.legend()
 
-
-
-
-
-plt.suptitle("Residue-wise Pocket RMSD Distributions", y=1.05)
+plt.suptitle("SARS-CoV-2 Mpro Residue-wise Pocket RMSD Distributions", y=1.05)
 plt.tight_layout()
-plt.savefig("pocket_rmsd_distributions-per-residue-histogram.png", dpi=300)
+plt.savefig("pocket_rmsd_distributions-per-residue-histogram-same-x-scale.png", dpi=300)
 plt.show()

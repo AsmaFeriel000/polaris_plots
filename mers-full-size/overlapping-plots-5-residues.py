@@ -129,7 +129,7 @@ plt.scatter(
     color="orange",
     s=150,
     edgecolor="black",
-    label="Mol 02 originally"
+    label="Compound 2 originally"
 )
 
 # Highlight point 2 (e.g., purple)
@@ -138,12 +138,12 @@ plt.scatter(
     color="yellow",
     s=150,
     edgecolor="black",
-    label="Mol 02 after side-chain modelling"
+    label="Compound 2 after side-chain modelling"
 )
 
 plt.xlabel("Pocket RMSD (Å)")
 plt.ylabel("Ligand RMSD (Å)")
-plt.title("Ligand vs Pocket RMSD for MERS-CoV Mpro")
+#plt.title("Ligand vs Pocket RMSD for MERS-CoV Mpro")
 
 plt.legend()
 plt.grid(True)
