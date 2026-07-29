@@ -1,1 +1,0 @@
-Plots using polaris challenge results to pick best scoring function and pick ligands for ABFE.

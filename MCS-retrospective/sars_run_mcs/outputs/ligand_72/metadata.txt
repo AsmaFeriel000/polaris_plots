@@ -1,0 +1,3 @@
+Target ligand: ligand_72
+Template ligand: mol-180
+Receptor: /home/campus.ncl.ac.uk/c2049423/programs/josh-polaris-with-receptor-match/polaris_fegrow_mcs-main/sars_run_mcs/receptors/receptor-180.pdb

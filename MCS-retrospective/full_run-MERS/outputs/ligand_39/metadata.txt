@@ -1,0 +1,3 @@
+Target ligand: ligand_39
+Template ligand: mol-218
+Receptor: /home/campus.ncl.ac.uk/c2049423/programs/josh-polaris-with-receptor-match/polaris_fegrow_mcs-main/full_run-MERS/receptors/receptor-218.pdb

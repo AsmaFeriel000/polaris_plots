@@ -1,5 +1,15 @@
-# polaris_plots
+## The pipeline
 
-## Note
-All the molecules are in subdirectory fegrow_result/resulting_mols for ease of viewing the folders, so to use some of the plotting scripts, please first move the molecule files to fegrow_result/
-Note that due to the upload limit of github, not all molecule files have been uploaded, and can be requested.
+The code that was used to produce the plots of the paper is all included here, and should be reproducible. The pipeline is performed in several steps, with instructions for how to run each step in the README file in each directory.
+
+## Python environment
+
+``` new-env.yaml``` should be used as the main environment for running all the scripts unless a different environment is specified in the directory's README.
+
+Create and activate the environment using the commands below:
+
+```conda env create -f new-env.yaml```
+
+```conda activate new-env```
+
+

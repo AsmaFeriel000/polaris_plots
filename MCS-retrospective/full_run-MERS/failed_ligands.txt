@@ -1,0 +1,9 @@
+ligand_64
+ligand_68
+ligand_3
+ligand_49
+ligand_87
+ligand_65
+ligand_21
+ligand_19
+ligand_59

@@ -1,0 +1,3 @@
+Target ligand: ligand_48
+Template ligand: mol-115
+Receptor: /home/campus.ncl.ac.uk/c2049423/programs/josh-polaris-with-receptor-match/polaris_fegrow_mcs-main/full_run-MERS/receptors/receptor-115.pdb
