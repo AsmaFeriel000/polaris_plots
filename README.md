@@ -1,6 +1,14 @@
-## The pipeline
+Data and scripts required to generate the plots for:
 
-The code that was used to produce the plots of the paper is all included here, and should be reproducible. The pipeline is performed in several steps, with instructions for how to run each step in the README file in each directory.
+**Evaluation of Physics-Based Pose Prediction and the Role of Receptor
+Flexibility in a Community Antiviral Blind Challenge**, by Asma
+Feriel Khoualdi, Finlay Clark, Josh Horton and Daniel Cole.
+
+Please see the [preprint](https://doi.org/10.26434/chemrxiv.15005028/v1)
+for further details.
+
+The pipeline is performed in several steps, with instructions for how
+to run each step in the README file in each directory.
 
 ## Directory overview
 
@@ -22,12 +30,11 @@ The numbered steps within each target directory are run in order:
 
 ## Python environment
 
-``` new-env.yaml``` should be used as the main environment for running all the scripts unless a different environment is specified in the directory's README.
+```new-env.yaml``` should be used as the main environment for running all the scripts unless a different environment is specified in the directory's README.
 
 Create and activate the environment using the commands below:
 
-```conda env create -f new-env.yaml```
-
-```conda activate new-env```
-
-
+```bash
+conda env create -f new-env.yaml
+conda activate new-env
+```
